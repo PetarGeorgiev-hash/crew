@@ -4,7 +4,10 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "dev": "turbo run dev",
+    "start:api": "turbo run dev --filter=@crew/api",
+    "start:mobile": "turbo run dev --filter=@crew/mobile",
+    "build": "turbo run build"
   },
   "keywords": [],
   "author": "",
