@@ -2,14 +2,13 @@
 # THIS FILE WAS AUTOMATICALLY GENERATED (DO NOT MODIFY)
 # ------------------------------------------------------
 
-type User {
+type UserModel {
   id: String!
-  firstName: String
-  lastName: String
+  email: String!
   userName: String!
+  avatarUrl: String
 }
 
 type Query {
-  findOne(id: String!): User!
-  findAll: [User!]!
+  findOne(id: String!): UserModel!
 }

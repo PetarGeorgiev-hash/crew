@@ -1,19 +1,14 @@
 import { Args, Query, Resolver } from '@nestjs/graphql';
-import { User } from './models/user.model';
+import { UserModel } from './models/user.model';
 import { UsersService } from './users.service';
 
-@Resolver(() => User)
+@Resolver(() => UserModel)
 export class UsersResolver {
   constructor(private readonly usersService: UsersService) {}
 
-  @Query(() => User)
+  @Query(() => UserModel)
   findOne(@Args('id') id: string) {
-    return this.usersService.findOneById(id);
-  }
-
-  @Query(() => [User])
-  findAll() {
-    return this.usersService.findAll();
+    return this.usersService.findById(id);
   }
 
   //todo: create mutations

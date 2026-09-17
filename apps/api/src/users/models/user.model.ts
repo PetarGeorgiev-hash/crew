@@ -1,16 +1,16 @@
 import { Field, ObjectType } from '@nestjs/graphql';
 
 @ObjectType()
-export class User {
+export class UserModel {
   @Field()
   id: string;
 
-  @Field({ nullable: true })
-  firstName?: string;
-
-  @Field({ nullable: true })
-  lastName?: string;
+  @Field()
+  email: string;
 
   @Field()
   userName: string;
+
+  @Field({ nullable: true })
+  avatarUrl: string;
 }
