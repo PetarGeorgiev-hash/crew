@@ -7,7 +7,10 @@
     "dev": "turbo run dev",
     "start:api": "turbo run dev --filter=@crew/api",
     "start:mobile": "turbo run dev --filter=@crew/mobile",
-    "build": "turbo run build"
+    "build": "turbo run build",
+    "db:generate": "cd apps/api && pnpm run db:generate",
+    "db:migrate": "cd apps/api && pnpm run db:migrate",
+    "db:studio": "cd apps/api && pnpm run db:studio"
   },
   "keywords": [],
   "author": "",

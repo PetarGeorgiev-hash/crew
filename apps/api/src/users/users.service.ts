@@ -3,8 +3,7 @@ import { DATABASE_CONNECTION } from '../db/db-connection';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { User, users } from './models/user.schema';
 import { eq } from 'drizzle-orm';
-import { UserModel } from './models/user.model';
-import { PgUUID } from 'drizzle-orm/pg-core';
+import { CreateUserModel } from './models/createUser-input.model';
 
 @Injectable()
 export class UsersService {
@@ -21,7 +20,7 @@ export class UsersService {
     return user;
   }
 
-  async findByEmial(email: string): Promise<User | undefined> {
+  async findByEmail(email: string): Promise<User | undefined> {
     const [user] = await this.db
       .select()
       .from(users)
@@ -39,11 +38,13 @@ export class UsersService {
     return user;
   }
 
-  async createWithPassword(userModel: UserModel): Promise<User> {
+  async createWithPassword(userModel: CreateUserModel): Promise<User> {
     const [user] = await this.db
       .insert(users)
       .values({
+        email: userModel.email,
         userName: userModel.userName,
+        passwordHash: userModel.passwordHash,
       })
       .returning();
 
@@ -63,15 +64,15 @@ export class UsersService {
   //   return user;
   // } figure out what should be done
 
-  async linkProviderId(userId: PgUUID, providerId: string): Promise<void> {
+  async linkProviderId(userId: string, providerId: string): Promise<void> {
     await this.db
       .update(users)
       .set({ providerId, updatedAt: new Date() })
-      .where(eq(userId, users.id));
+      .where(eq(users.id, userId));
   }
 
   async updateRefreshToken(
-    userId: PgUUID,
+    userId: string,
     refreshTokenHash: string,
   ): Promise<void> {
     await this.db
@@ -80,7 +81,7 @@ export class UsersService {
       .where(eq(users.id, userId));
   }
 
-  async clearRefreshTokenHash(userId: PgUUID): Promise<void> {
+  async clearRefreshTokenHash(userId: string): Promise<void> {
     await this.db
       .update(users)
       .set({ refreshTokenHash: null, updatedAt: new Date() })
@@ -88,7 +89,7 @@ export class UsersService {
   }
 
   async setResetPasswordToken(
-    userId: PgUUID,
+    userId: string,
     passwordResetTokenHash: string,
     passwordResetTokenExpiresAt: Date,
   ): Promise<void> {
@@ -102,7 +103,7 @@ export class UsersService {
       .where(eq(users.id, userId));
   }
 
-  async clearRefrehTokenHash(userId: PgUUID): Promise<void> {
+  async clearRefrehTokenHash(userId: string): Promise<void> {
     await this.db
       .update(users)
       .set({
@@ -113,7 +114,7 @@ export class UsersService {
   }
 
   async setPasswordResetToken(
-    userId: PgUUID,
+    userId: string,
     passwordResetTokenHash: string,
     passwordResetTokenExpiresAt: Date,
   ): Promise<void> {
@@ -127,7 +128,7 @@ export class UsersService {
       .where(eq(users.id, userId));
   }
 
-  async resetPassword(userId: PgUUID, passwordHash: string): Promise<void> {
+  async resetPassword(userId: string, passwordHash: string): Promise<void> {
     await this.db
       .update(users)
       .set({

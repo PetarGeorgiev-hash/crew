@@ -4,5 +4,6 @@ packages:
 allowBuilds:
   '@apollo/protobufjs': true
   '@parcel/watcher': true
+  argon2: true
   esbuild: true
   unrs-resolver: true

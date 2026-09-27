@@ -6,8 +6,8 @@ export const users = pgTable('users', {
     .primaryKey()
     .default(sql`uuidv7()`),
 
-  email: varchar('email', { length: 255 }).unique(),
-  userName: varchar('user_name', { length: 255 }),
+  email: varchar('email', { length: 255 }).unique().notNull(),
+  userName: varchar('user_name', { length: 255 }).notNull(),
   passwordHash: varchar('password_hash', { length: 255 }),
   avatarUrl: varchar('avatar_url', { length: 512 }),
 

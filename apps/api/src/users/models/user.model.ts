@@ -11,6 +11,6 @@ export class UserModel {
   @Field()
   userName: string;
 
-  @Field({ nullable: true })
-  avatarUrl: string;
+  @Field(() => String, { nullable: true })
+  avatarUrl: string | null;
 }

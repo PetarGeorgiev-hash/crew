@@ -9,6 +9,33 @@ type UserModel {
   avatarUrl: String
 }
 
+type AuthResult {
+  user: UserModel!
+  accessToken: String!
+  refreshToken: String!
+}
+
 type Query {
   findOne(id: String!): UserModel!
+}
+
+type Mutation {
+  login(loginModel: LoginModel!): AuthResult!
+  register(registerModel: RegisterModel!): AuthResult!
+  refresh(refreshTokenInput: RefreshTokenInput!): AuthResult!
+}
+
+input LoginModel {
+  email: String!
+  password: String!
+}
+
+input RegisterModel {
+  name: String!
+  email: String!
+  password: String!
+}
+
+input RefreshTokenInput {
+  refreshToken: String!
 }
