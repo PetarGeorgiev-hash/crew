@@ -7,7 +7,16 @@ type UserModel {
   email: String!
   userName: String!
   avatarUrl: String
+  provider: String
+  providerId: String
+  createdAt: DateTime!
+  updatedAt: DateTime!
 }
+
+"""
+A date-time string at UTC, such as 2019-12-03T09:54:33Z, compliant with the date-time format.
+"""
+scalar DateTime
 
 type AuthResult {
   user: UserModel!
@@ -15,14 +24,20 @@ type AuthResult {
   refreshToken: String!
 }
 
+type LogoutResponse {
+  success: Boolean!
+}
+
 type Query {
   findOne(id: String!): UserModel!
+  getProfile: UserModel!
 }
 
 type Mutation {
   login(loginModel: LoginModel!): AuthResult!
   register(registerModel: RegisterModel!): AuthResult!
   refresh(refreshTokenInput: RefreshTokenInput!): AuthResult!
+  logout: LogoutResponse!
 }
 
 input LoginModel {

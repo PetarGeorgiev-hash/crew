@@ -1,7 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { DATABASE_CONNECTION } from '../db/db-connection';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
-import { User, users } from './models/user.schema';
+import { SafeUser, User, users } from './models/user.schema';
 import { eq } from 'drizzle-orm';
 import { CreateUserModel } from './models/createUser-input.model';
 
@@ -51,6 +51,18 @@ export class UsersService {
     return user;
   }
 
+  toSafeUser(user: User): SafeUser {
+    return {
+      id: user.id,
+      email: user.email,
+      userName: user.userName,
+      avatarUrl: user.avatarUrl,
+      provider: user.provider,
+      providerId: user.providerId,
+      createdAt: user.createdAt,
+      updatedAt: user.updatedAt,
+    };
+  }
   // async createOAuthUser(userModel: UserModel): Promise<User> {
   //   const [user] = await this.db
   //     .insert(users)

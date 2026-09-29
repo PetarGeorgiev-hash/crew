@@ -6,10 +6,10 @@ import {
 import { UsersService } from '../users/users.service';
 import { JwtService, JwtSignOptions } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
-import { JwtPayload } from './models/jwt-payload.type';
+import { JwtPayload } from './types/jwt-payload.type';
 import { RegisterModel } from './models/register-input.model';
 import * as argon2 from 'argon2';
-import { User } from '../users/models/user.schema';
+import { SafeUser, User } from '../users/models/user.schema';
 import { LoginModel } from './models/login-input.model';
 import { AuthResult } from './models/auth-result.model';
 
@@ -52,6 +52,12 @@ export class AuthService {
       this.generateRefreshToken(payload),
     ]);
     return { accessToken, refreshToken };
+  }
+
+  async verifyAccessToken(token: string): Promise<JwtPayload> {
+    return this.jwtService.verifyAsync<JwtPayload>(token, {
+      secret: this.configService.getOrThrow<string>('ACCESS_TOKEN_SECRET'),
+    });
   }
 
   private toAuthResult(
@@ -152,5 +158,18 @@ export class AuthService {
     await this.userService.updateRefreshToken(user.id, refreshTokenHash);
 
     return this.toAuthResult(user, accessToken, refreshToken);
+  }
+
+  async logout(userId: string): Promise<{ success: true }> {
+    await this.userService.clearRefrehTokenHash(userId);
+    return { success: true };
+  }
+
+  async getProfile(userId: string): Promise<SafeUser> {
+    const user = await this.userService.findById(userId);
+    if (!user) {
+      throw new UnauthorizedException('User no longer exists');
+    }
+    return this.userService.toSafeUser(user);
   }
 }
