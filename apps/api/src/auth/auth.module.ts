@@ -5,13 +5,16 @@ import { AuthResolver } from './auth.resolver';
 import { JwtModule } from '@nestjs/jwt';
 import { AccessTokenGuard } from './guards/access-token.guard';
 import { APP_GUARD } from '@nestjs/core';
+import { RefreshTokensRepository } from './auth.repository';
+import { MailModule } from '../mail/mail.module';
 
 @Module({
-  imports: [UsersModule, JwtModule.register({})],
+  imports: [UsersModule, MailModule, JwtModule.register({})],
   providers: [
     AuthService,
     AuthResolver,
     AccessTokenGuard,
+    RefreshTokensRepository,
     { provide: APP_GUARD, useClass: AccessTokenGuard },
   ],
 })

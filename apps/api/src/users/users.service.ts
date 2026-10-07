@@ -1,7 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { DATABASE_CONNECTION } from '../db/db-connection';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
-import { SafeUser, User, users } from './models/user.schema';
+import { SafeUser, User, users } from './schema/user.schema';
 import { eq } from 'drizzle-orm';
 import { CreateUserModel } from './models/createUser-input.model';
 
@@ -29,15 +29,6 @@ export class UsersService {
     return user;
   }
 
-  async findByProviderId(providerId: string): Promise<User | undefined> {
-    const [user] = await this.db
-      .select()
-      .from(users)
-      .where(eq(users.providerId, providerId))
-      .limit(1);
-    return user;
-  }
-
   async createWithPassword(userModel: CreateUserModel): Promise<User> {
     const [user] = await this.db
       .insert(users)
@@ -47,7 +38,6 @@ export class UsersService {
         passwordHash: userModel.passwordHash,
       })
       .returning();
-
     return user;
   }
 
@@ -57,72 +47,10 @@ export class UsersService {
       email: user.email,
       userName: user.userName,
       avatarUrl: user.avatarUrl,
-      provider: user.provider,
-      providerId: user.providerId,
       createdAt: user.createdAt,
       updatedAt: user.updatedAt,
+      emailVerifeid: user.emailVerifeid,
     };
-  }
-  // async createOAuthUser(userModel: UserModel): Promise<User> {
-  //   const [user] = await this.db
-  //     .insert(users)
-  //     .values({
-  //       userName: userModel.userName,
-  //       avatarUrl: userModel.avatarUrl,
-  //       provider: userModel.provider,
-  //     })
-  //     .returning();
-
-  //   return user;
-  // } figure out what should be done
-
-  async linkProviderId(userId: string, providerId: string): Promise<void> {
-    await this.db
-      .update(users)
-      .set({ providerId, updatedAt: new Date() })
-      .where(eq(users.id, userId));
-  }
-
-  async updateRefreshToken(
-    userId: string,
-    refreshTokenHash: string,
-  ): Promise<void> {
-    await this.db
-      .update(users)
-      .set({ refreshTokenHash, updatedAt: new Date() })
-      .where(eq(users.id, userId));
-  }
-
-  async clearRefreshTokenHash(userId: string): Promise<void> {
-    await this.db
-      .update(users)
-      .set({ refreshTokenHash: null, updatedAt: new Date() })
-      .where(eq(users.id, userId));
-  }
-
-  async setResetPasswordToken(
-    userId: string,
-    passwordResetTokenHash: string,
-    passwordResetTokenExpiresAt: Date,
-  ): Promise<void> {
-    await this.db
-      .update(users)
-      .set({
-        passwordResetTokenHash,
-        passwordResetTokenExpiresAt,
-        updatedAt: new Date(),
-      })
-      .where(eq(users.id, userId));
-  }
-
-  async clearRefrehTokenHash(userId: string): Promise<void> {
-    await this.db
-      .update(users)
-      .set({
-        refreshTokenHash: null,
-        updatedAt: new Date(),
-      })
-      .where(eq(users.id, userId));
   }
 
   async setPasswordResetToken(
@@ -147,7 +75,6 @@ export class UsersService {
         passwordHash,
         passwordResetTokenHash: null,
         passwordResetTokenExpiresAt: null,
-        refreshTokenHash: null,
         updatedAt: new Date(),
       })
       .where(eq(users.id, userId));

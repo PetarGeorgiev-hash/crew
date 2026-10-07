@@ -1,5 +1,5 @@
 import { Field, ObjectType } from '@nestjs/graphql';
-import { SafeUser } from './user.schema';
+import { SafeUser } from '../schema/user.schema';
 
 @ObjectType()
 export class UserModel implements SafeUser {
@@ -15,15 +15,12 @@ export class UserModel implements SafeUser {
   @Field(() => String, { nullable: true })
   avatarUrl: string | null;
 
-  @Field(() => String, { nullable: true })
-  provider: string | null;
-
-  @Field(() => String, { nullable: true })
-  providerId: string | null;
-
   @Field(() => Date)
   createdAt: Date;
 
   @Field(() => Date)
   updatedAt: Date;
+
+  @Field()
+  emailVerifeid: boolean;
 }

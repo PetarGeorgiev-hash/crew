@@ -7,10 +7,9 @@ type UserModel {
   email: String!
   userName: String!
   avatarUrl: String
-  provider: String
-  providerId: String
   createdAt: DateTime!
   updatedAt: DateTime!
+  emailVerifeid: Boolean!
 }
 
 """

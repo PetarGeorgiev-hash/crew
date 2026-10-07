@@ -1,6 +1,7 @@
 {
   "compilerOptions": {
-    "types": ["jest"],
+    "rootDir": ".",
+    "types": ["vitest/globals", "node"],
     "module": "nodenext",
     "moduleResolution": "nodenext",
     "resolvePackageJsonExports": true,

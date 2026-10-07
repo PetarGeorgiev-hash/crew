@@ -25,6 +25,7 @@ export class AuthResolver {
     return this.authService.register(registerModel);
   }
 
+  @Public()
   @Mutation(() => AuthResult)
   async refresh(
     @Args('refreshTokenInput') refreshTokenInput: RefreshTokenInput,

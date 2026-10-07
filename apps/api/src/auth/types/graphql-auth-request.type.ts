@@ -4,6 +4,6 @@ export type GraphqlAuthRequest = {
   };
   user?: {
     sub: string;
-    email: string;
+    sid: string;
   };
 };

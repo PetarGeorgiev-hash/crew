@@ -1,4 +1,10 @@
-import { pgTable, timestamp, uuid, varchar } from 'drizzle-orm/pg-core';
+import {
+  boolean,
+  pgTable,
+  timestamp,
+  uuid,
+  varchar,
+} from 'drizzle-orm/pg-core';
 import { sql } from 'drizzle-orm/sql';
 
 export const users = pgTable('users', {
@@ -11,15 +17,16 @@ export const users = pgTable('users', {
   passwordHash: varchar('password_hash', { length: 255 }),
   avatarUrl: varchar('avatar_url', { length: 512 }),
 
-  provider: varchar('provider', { length: 255 }),
-  providerId: varchar('provider_id', { length: 255 }),
-
   refreshTokenHash: varchar('refresh_token_hash', { length: 255 }),
 
-  passwordResetTokenHash: varchar('password_reset_token_hash', { length: 255 }),
+  passwordResetTokenHash: varchar('password_reset_token_hash', {
+    length: 255,
+  }),
   passwordResetTokenExpiresAt: timestamp('password_reset_token_expires_at', {
     withTimezone: true,
   }),
+
+  emailVerifeid: boolean('email_verifeid').notNull().default(false),
 
   createdAt: timestamp('created_at', { withTimezone: true })
     .defaultNow()
