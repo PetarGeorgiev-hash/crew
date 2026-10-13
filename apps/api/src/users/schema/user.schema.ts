@@ -1,0 +1,47 @@
+import {
+  boolean,
+  pgTable,
+  timestamp,
+  uuid,
+  varchar,
+} from 'drizzle-orm/pg-core';
+import { sql } from 'drizzle-orm/sql';
+
+export const users = pgTable('users', {
+  id: uuid('id')
+    .primaryKey()
+    .default(sql`uuidv7()`),
+
+  email: varchar('email', { length: 255 }).unique().notNull(),
+  userName: varchar('user_name', { length: 255 }).notNull(),
+  passwordHash: varchar('password_hash', { length: 255 }),
+  avatarUrl: varchar('avatar_url', { length: 512 }),
+
+  refreshTokenHash: varchar('refresh_token_hash', { length: 255 }),
+
+  passwordResetTokenHash: varchar('password_reset_token_hash', {
+    length: 255,
+  }),
+  passwordResetTokenExpiresAt: timestamp('password_reset_token_expires_at', {
+    withTimezone: true,
+  }),
+
+  emailVerified: boolean('email_verifeid').notNull().default(false),
+
+  createdAt: timestamp('created_at', { withTimezone: true })
+    .defaultNow()
+    .notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true })
+    .defaultNow()
+    .notNull(),
+});
+
+export type User = typeof users.$inferSelect;
+export type NewUser = typeof users.$inferInsert;
+export type SafeUser = Omit<
+  User,
+  | 'passwordHash'
+  | 'refreshTokenHash'
+  | 'passwordResetTokenHash'
+  | 'passwordResetTokenExpiresAt'
+>;

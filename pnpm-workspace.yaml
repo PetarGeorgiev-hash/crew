@@ -2,6 +2,8 @@ packages:
   - "apps/*"
   - "packages/*"
 allowBuilds:
-  '@parcel/watcher': true
+  '@apollo/protobufjs': true
+  '@swc/core': true
+  argon2: true
   esbuild: true
   unrs-resolver: true

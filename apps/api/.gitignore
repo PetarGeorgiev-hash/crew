@@ -2,6 +2,15 @@
 /dist
 /node_modules
 /build
+*.tsbuildinfo
+
+# test coverage
+/coverage
+
+# stray compiled config files
+vitest.config.js
+vitest.config.d.ts
+vitest.config.js.map
 
 # Logs
 logs
