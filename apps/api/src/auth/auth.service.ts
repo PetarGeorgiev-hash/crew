@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ConflictException,
   Injectable,
   Logger,
@@ -16,6 +17,7 @@ import { LoginModel } from './models/login-input.model';
 import { AuthResult } from './models/auth-result.model';
 import { RefreshTokensRepository } from './auth.repository';
 import { Cron, CronExpression } from '@nestjs/schedule';
+import { MailService } from '../mail/mail.service';
 
 @Injectable()
 export class AuthService {
@@ -24,6 +26,7 @@ export class AuthService {
     private readonly jwtService: JwtService,
     private readonly userService: UsersService,
     private readonly configService: ConfigService,
+    private readonly mailService: MailService,
     private readonly refreshTokensRepository: RefreshTokensRepository,
   ) {}
 
@@ -99,6 +102,7 @@ export class AuthService {
         email: user.email,
         userName: user.userName,
         avatarUrl: user.avatarUrl ?? undefined,
+        emailVerified: user.emailVerified,
       },
       accessToken,
       refreshToken,
@@ -131,7 +135,36 @@ export class AuthService {
     }
 
     const { accessToken, refreshToken } = await this.startSession(user);
+    try {
+      await this.mailService.sendVerification(user.id, user.email);
+    } catch (e) {
+      this.logger.error(
+        `Failed to send verification email for user ${user.id}`,
+        e instanceof Error ? e.stack : String(e),
+      );
+    }
     return this.toAuthResult(user, accessToken, refreshToken);
+  }
+
+  async verifyEmail(userId: string, code: string): Promise<boolean> {
+    const user = await this.userService.findById(userId);
+    if (!user) throw new BadRequestException('User does not exist');
+
+    if (user.emailVerified) return true;
+
+    const verify = await this.mailService.verify(userId, code);
+    if (!verify) {
+      throw new BadRequestException('Invalid or expired code');
+    }
+
+    await this.userService.markVerifiedEmail(userId);
+    return true;
+  }
+
+  async resendVerifyEmail(userId: string): Promise<void> {
+    const user = await this.userService.findById(userId);
+    if (!user || user.emailVerified) return;
+    await this.mailService.sendVerification(userId, user.email);
   }
 
   async login(loginModel: LoginModel): Promise<AuthResult> {

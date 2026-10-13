@@ -10,6 +10,7 @@ export class AuthResult {
     email: string;
     userName: string;
     avatarUrl?: string;
+    emailVerified: boolean;
   };
   @Field()
   accessToken: string;

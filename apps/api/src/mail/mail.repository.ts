@@ -19,7 +19,7 @@ export class MailRepository {
       .insert(emailVerifications)
       .values(mail)
       .onConflictDoUpdate({
-        target: emailVerifications.id,
+        target: emailVerifications.userId,
         set: {
           toEmail: mail.toEmail,
           userId: mail.userId,

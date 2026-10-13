@@ -9,7 +9,7 @@ type UserModel {
   avatarUrl: String
   createdAt: DateTime!
   updatedAt: DateTime!
-  emailVerifeid: Boolean!
+  emailVerified: Boolean!
 }
 
 """
@@ -37,6 +37,8 @@ type Mutation {
   register(registerModel: RegisterModel!): AuthResult!
   refresh(refreshTokenInput: RefreshTokenInput!): AuthResult!
   logout: LogoutResponse!
+  verifyEmail(input: VerifyEmailInput!): Boolean!
+  resendVerifyEmail: Boolean!
 }
 
 input LoginModel {
@@ -52,4 +54,8 @@ input RegisterModel {
 
 input RefreshTokenInput {
   refreshToken: String!
+}
+
+input VerifyEmailInput {
+  code: String!
 }

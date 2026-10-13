@@ -9,10 +9,15 @@ import { AuthModule } from './auth/auth.module';
 import type { Request } from 'express';
 import { ScheduleModule } from '@nestjs/schedule';
 import { MailModule } from './mail/mail.module';
+import { envSchema } from './config/env.schema';
 
 @Module({
   imports: [
-    ConfigModule.forRoot({ isGlobal: true, envFilePath: './.env' }),
+    ConfigModule.forRoot({
+      isGlobal: true,
+      envFilePath: './.env',
+      validationSchema: envSchema,
+    }),
     DbModule,
     GraphQLModule.forRoot<ApolloDriverConfig>({
       driver: ApolloDriver,

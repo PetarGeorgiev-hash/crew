@@ -49,7 +49,7 @@ export class UsersService {
       avatarUrl: user.avatarUrl,
       createdAt: user.createdAt,
       updatedAt: user.updatedAt,
-      emailVerifeid: user.emailVerifeid,
+      emailVerified: user.emailVerified,
     };
   }
 
@@ -75,6 +75,16 @@ export class UsersService {
         passwordHash,
         passwordResetTokenHash: null,
         passwordResetTokenExpiresAt: null,
+        updatedAt: new Date(),
+      })
+      .where(eq(users.id, userId));
+  }
+
+  async markVerifiedEmail(userId: string): Promise<void> {
+    await this.db
+      .update(users)
+      .set({
+        emailVerified: true,
         updatedAt: new Date(),
       })
       .where(eq(users.id, userId));

@@ -22,5 +22,5 @@ export class UserModel implements SafeUser {
   updatedAt: Date;
 
   @Field()
-  emailVerifeid: boolean;
+  emailVerified: boolean;
 }

@@ -5,14 +5,14 @@ export default defineConfig({
   test: {
     globals: true,
     root: './',
-    include: ['src/**/*.spec.ts'],
+    include: ['src/**/*.test.ts'],
     fileParallelism: false,
     setupFiles: ['dotenv/config'],
     coverage: {
       provider: 'v8',
       include: ['src/**/*.ts'],
       exclude: [
-        'src/**/*.spec.ts',
+        'src/**/*.test.ts',
         'src/main.ts',
         'src/**/*.module.ts',
         'src/**/*.schema.ts',

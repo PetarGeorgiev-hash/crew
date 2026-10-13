@@ -3,9 +3,13 @@ import { MailProvider } from './mail.provider';
 import { ConfigService } from '@nestjs/config';
 import { ResendMailProvider } from './resend-mail.provider';
 import { ConsoleMailProvider } from './console-mail.provider';
+import { MailService } from './mail.service';
+import { MailRepository } from './mail.repository';
 
 @Module({
   providers: [
+    MailRepository,
+    MailService,
     {
       provide: MailProvider,
       useFactory: (configService: ConfigService): MailProvider => {
@@ -16,6 +20,6 @@ import { ConsoleMailProvider } from './console-mail.provider';
       inject: [ConfigService],
     },
   ],
-  exports: [MailProvider],
+  exports: [MailService],
 })
 export class MailModule {}

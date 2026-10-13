@@ -26,7 +26,7 @@ export const users = pgTable('users', {
     withTimezone: true,
   }),
 
-  emailVerifeid: boolean('email_verifeid').notNull().default(false),
+  emailVerified: boolean('email_verifeid').notNull().default(false),
 
   createdAt: timestamp('created_at', { withTimezone: true })
     .defaultNow()
