@@ -1,98 +1,80 @@
-<p align="center">
-  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
-</p>
+# API
 
-[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
-[circleci-url]: https://circleci.com/gh/nestjs/nest
+The API is a NestJS application that exposes a GraphQL endpoint and uses PostgreSQL through Drizzle ORM. For repository-wide installation, environment setup, local development, and Docker instructions, see the [root README](../../README.md).
 
-  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
-<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
-<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
-<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg" alt="Donate us"/></a>
-    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
-  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow" alt="Follow us on Twitter"></a>
-</p>
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
+## Source layout
 
-## Description
-
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
-
-## Project setup
-
-```bash
-$ pnpm install
+```text
+src/
+  app.module.ts          Root Nest module; wires feature modules and GraphQL
+  main.ts                Application bootstrap and global validation pipe
+  auth/                  Authentication, authorization, and token handling
+  config/                Environment schema and configuration validation
+  db/                    PostgreSQL connection and Drizzle configuration
+  mail/                  Verification mail providers and email-code logic
+  users/                 User GraphQL operations and user persistence
+  utils/                 Shared utility functions and test helpers
+test/                    End-to-end tests
+drizzle/                 Generated SQL migrations and Drizzle snapshots
 ```
 
-## Compile and run the project
+Features are organized as Nest modules. Within a feature, the common files are:
 
-```bash
-# development
-$ pnpm run start
+- `*.module.ts`: registers the feature's providers and imports.
+- `*.resolver.ts`: defines GraphQL queries and mutations.
+- `*.service.ts`: implements application and business logic.
+- `*.repository.ts`: performs persistence operations where the feature uses a repository.
+- `models/`: GraphQL input and output classes used by resolvers. These are API types, not database table definitions.
+- `schema/`: Drizzle table definitions that describe PostgreSQL tables and relations.
+- `tests/`: feature-level unit tests, commonly for services, repositories, or utilities.
 
-# watch mode
-$ pnpm run start:dev
+For example, `auth/resolver` handles GraphQL authentication operations, `auth/service` coordinates authentication behavior, `auth/schema` defines authentication-related tables, and `auth/tests` tests that feature's logic and persistence.
 
-# production mode
-$ pnpm run start:prod
+## GraphQL and authentication
+
+The GraphQL endpoint is available at `http://localhost:3000/graphql` in local development. Resolvers declare the API operations; protected operations use the access-token guard and receive the authenticated user through the `@CurrentUser()` decorator. Operations explicitly marked `@Public()` do not require an access token.
+
+The root module loads and validates environment variables against `src/config/env.schema.ts`. Configure `apps/api/.env` before starting the API; see the root README for the required values.
+
+## Database
+
+Drizzle table definitions live in each feature's `schema/` directory. Generated migrations and snapshots are stored in `drizzle/`.
+
+Run these commands from the repository root:
+
+```sh
+pnpm db:generate
+pnpm db:migrate
+pnpm db:studio
 ```
 
-## Run tests
+Generate a migration after changing a schema, review the generated SQL, and apply it to the configured database with `pnpm db:migrate`.
 
-```bash
-# unit tests
-$ pnpm run test
+## Tests
 
-# e2e tests
-$ pnpm run test:e2e
+Unit tests use Vitest and are located alongside feature code under `src/**/tests/`. Run them from the repository root:
 
-# test coverage
-$ pnpm run test:cov
+```sh
+pnpm --filter @crew/api test
+pnpm --filter @crew/api test:watch
+pnpm --filter @crew/api test:cov
 ```
 
-## Deployment
+End-to-end tests are under `test/` and use a running, migrated database and the API test environment. The configured runner is:
 
-When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
-
-If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:
-
-```bash
-$ pnpm install -g @nestjs/mau
-$ mau deploy
+```sh
+pnpm --filter @crew/api test:e2e
 ```
 
-With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than managing infrastructure.
+The current e2e configuration selects files named `*.e2e-spec.ts`; the checked-in test is named `auth.e2e-test.ts`. Rename the test or adjust `vitest.config.e2e.ts` so the runner includes it.
 
-## Resources
+## Other API commands
 
-Check out a few resources that may come in handy when working with NestJS:
+Run these commands from the repository root:
 
-- Visit the [NestJS Documentation](https://docs.nestjs.com) to learn more about the framework.
-- For questions and support, please visit our [Discord channel](https://discord.gg/G7Qnnhy).
-- To dive deeper and get more hands-on experience, check out our official video [courses](https://courses.nestjs.com/).
-- Deploy your application to AWS with the help of [NestJS Mau](https://mau.nestjs.com) in just a few clicks.
-- Visualize your application graph and interact with the NestJS application in real-time using [NestJS Devtools](https://devtools.nestjs.com).
-- Need help with your project (part-time to full-time)? Check out our official [enterprise support](https://enterprise.nestjs.com).
-- To stay in the loop and get updates, follow us on [X](https://x.com/nestframework) and [LinkedIn](https://linkedin.com/company/nestjs).
-- Looking for a job, or have a job to offer? Check out our official [Jobs board](https://jobs.nestjs.com).
-
-## Support
-
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
-
-## Stay in touch
-
-- Author - [Kamil Myśliwiec](https://twitter.com/kammysliwiec)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
-
-## License
-
-Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
+| Command | Description |
+| --- | --- |
+| `pnpm --filter @crew/api dev` | Start the API in watch mode |
+| `pnpm --filter @crew/api build` | Build the API |
+| `pnpm --filter @crew/api check-types` | Type-check the API |
+| `pnpm --filter @crew/api lint` | Lint API TypeScript files |
