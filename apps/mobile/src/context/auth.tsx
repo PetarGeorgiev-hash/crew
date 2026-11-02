@@ -6,26 +6,77 @@ import {
   AuthUserFieldsFragment,
   SignInWithGoogleDocument,
   LogoutDocument,
-  RefreshDocument,
   WebSignInWithGoogleDocument,
-  WebRefreshTokenDocument,
   WebLogoutDocument,
   LoginDocument,
   WebLoginDocument,
+  RefreshDocument,
+  WebRefreshTokenDocument,
 } from "@/gql/graphql";
 import { useFragment as getFragmentData } from "@/gql/fragment-masking";
 import {
   EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID,
   EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID,
+  API_URL,
   REFRESH_TOKEN_KEY,
 } from "@/utils/constants";
+import { ApolloClient, HttpLink, InMemoryCache } from "@apollo/client";
 import { useMutation } from "@apollo/client/react";
 import * as SecureStore from "expo-secure-store";
 import { Platform } from "react-native";
+import { singleFlight } from "@/auth/single-flight";
 
 export type AuthUser = AuthUserFieldsFragment;
 
 WebBrowser.maybeCompleteAuthSession();
+
+const refreshClient = new ApolloClient({
+  link: new HttpLink({
+    uri: API_URL,
+    credentials: Platform.OS === "web" ? "include" : "omit",
+  }),
+  cache: new InMemoryCache(),
+});
+
+const performRefreshSession = async (): Promise<{
+  accessToken: string;
+  user: AuthUser;
+} | null> => {
+  if (Platform.OS === "web") {
+    const { data } = await refreshClient.mutate({
+      mutation: WebRefreshTokenDocument,
+      fetchPolicy: "no-cache",
+    });
+    const result = data?.webRefresh;
+    if (!result) throw new Error("Refresh returned no authentication data");
+
+    setAccessToken(result.accessToken);
+    return {
+      accessToken: result.accessToken,
+      user: getFragmentData(AuthUserFieldsFragmentDoc, result.user),
+    };
+  }
+
+  const refreshToken = await getRefreshToken();
+  if (!refreshToken) return null;
+
+  const { data } = await refreshClient.mutate({
+    mutation: RefreshDocument,
+    variables: { refreshTokenInput: { refreshToken } },
+    fetchPolicy: "no-cache",
+  });
+  const result = data?.refresh;
+  if (!result) throw new Error("Refresh returned no authentication data");
+
+  await setRefreshToken(result.refreshToken);
+  setAccessToken(result.accessToken);
+  return {
+    accessToken: result.accessToken,
+    user: getFragmentData(AuthUserFieldsFragmentDoc, result.user),
+  };
+};
+
+export const refreshSession = singleFlight(performRefreshSession);
 
 enum AuthMethod {
   local,
@@ -44,8 +95,9 @@ const AuthContext = React.createContext({
 
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [user, setUser] = React.useState<AuthUser | null>(null);
-  const [isLoading, setIsLoading] = React.useState(false);
+  const [isLoading, setIsLoading] = React.useState(true);
   const [error, setError] = React.useState<Error | null>(null);
+  const restoreSessionRef = React.useRef<Promise<AuthUser | null> | null>(null);
   //TODO: add Apple and Meta auth options
   const [_requst, _response, promptAsync] = useIdTokenAuthRequest({
     //TODO: add Android google client id
@@ -55,16 +107,20 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   });
 
   //local
-  const [loginMutation] = useMutation(LoginDocument);
-  const [webLoginMutation] = useMutation(WebLoginDocument);
+  const [loginMutation] = useMutation(LoginDocument, {
+    context: { skipAuthRefresh: true },
+  });
+  const [webLoginMutation] = useMutation(WebLoginDocument, {
+    context: { skipAuthRefresh: true },
+  });
 
   //google
-  const [signInWithGoogle] = useMutation(SignInWithGoogleDocument);
-  const [webSignInWithGoogle] = useMutation(WebSignInWithGoogleDocument);
-
-  //refresh
-  const [refreshMutation] = useMutation(RefreshDocument);
-  const [webRefreshMutation] = useMutation(WebRefreshTokenDocument);
+  const [signInWithGoogle] = useMutation(SignInWithGoogleDocument, {
+    context: { skipAuthRefresh: true },
+  });
+  const [webSignInWithGoogle] = useMutation(WebSignInWithGoogleDocument, {
+    context: { skipAuthRefresh: true },
+  });
 
   //logout
   const [logoutMutation] = useMutation(LogoutDocument);
@@ -75,57 +131,30 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   React.useEffect(() => {
     let cancelled = false;
 
-    const restoreSession = async () => {
-      setError(null);
-      setIsLoading(true);
+    if (!restoreSessionRef.current) {
+      restoreSessionRef.current = (async () => {
+        const result = await refreshSession();
+        return result?.user ?? null;
+      })();
+    }
 
-      try {
-        if (isWeb) {
-          const { data } = await webRefreshMutation();
-          const result = data?.webRefresh;
-          if (!result) {
-            throw new Error("Refresh returned no authentication data");
-          }
-
-          setAccessToken(result.accessToken);
-          if (!cancelled) {
-            setUser(getFragmentData(AuthUserFieldsFragmentDoc, result.user));
-          }
-        } else {
-          const refreshToken = await getRefreshToken();
-          if (!refreshToken) return;
-
-          const { data } = await refreshMutation({
-            variables: {
-              refreshTokenInput: { refreshToken },
-            },
-          });
-          const result = data?.refresh;
-          if (!result) {
-            throw new Error("Refresh returned no authentication data");
-          }
-
-          await setRefreshToken(result.refreshToken);
-          setAccessToken(result.accessToken);
-          if (!cancelled) {
-            setUser(getFragmentData(AuthUserFieldsFragmentDoc, result.user));
-          }
-        }
-      } catch (cause) {
+    void restoreSessionRef.current
+      .then((restoredUser) => {
+        if (!cancelled && restoredUser) setUser(restoredUser);
+      })
+      .catch((cause: unknown) => {
         if (!cancelled) {
           setError(cause instanceof Error ? cause : new Error(String(cause)));
         }
-      } finally {
+      })
+      .finally(() => {
         if (!cancelled) setIsLoading(false);
-      }
-    };
-
-    void restoreSession();
+      });
 
     return () => {
       cancelled = true;
     };
-  }, [refreshMutation]);
+  }, []);
 
   const signIn = async (
     method: AuthMethod = AuthMethod.local,
@@ -232,15 +261,16 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     setIsLoading(true);
 
     try {
+      const err = "The server did not confirm sign-out";
       if (isWeb) {
         const { data } = await webLogoutMutation();
         if (!data?.webLogout.success) {
-          throw new Error("The server did not confirm sign-out");
+          throw new Error(err);
         }
       } else {
         const { data } = await logoutMutation();
         if (!data?.logout.success) {
-          throw new Error("The server did not confirm sign-out");
+          throw new Error(err);
         }
         await clearTokens();
       }

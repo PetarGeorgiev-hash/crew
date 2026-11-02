@@ -8,6 +8,8 @@
     "dev:api": "turbo run dev db:studio --filter=@crew/api",
     "dev:mobile": "turbo run dev --filter=@crew/mobile",
     "build": "turbo run build",
+    "check-types": "turbo run check-types",
+    "test": "turbo run test",
     "db:generate": "cd apps/api && pnpm run db:generate",
     "db:migrate": "cd apps/api && pnpm run db:migrate",
     "db:studio": "cd apps/api && pnpm run db:studio"
