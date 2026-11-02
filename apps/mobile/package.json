@@ -40,12 +40,14 @@
     "@graphql-codegen/client-preset": "^6.2.3",
     "@react-native/metro-config": "0.86.3",
     "@types/react": "~19.3.0",
-    "typescript": "~6.0.3"
+    "typescript": "~6.0.3",
+    "vitest": "^5.0.3"
   },
   "scripts": {
     "codegen": "graphql-codegen --config codegen.ts",
     "start": "expo start",
     "dev": "expo start",
+    "test": "vitest run",
     "check-types": "tsc --noEmit",
     "reset-project": "node ./scripts/reset-project.js",
     "android": "expo start --android",

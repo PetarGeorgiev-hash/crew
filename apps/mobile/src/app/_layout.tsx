@@ -3,12 +3,13 @@ import * as SplashScreen from "expo-splash-screen";
 import { Platform, useColorScheme } from "react-native";
 import { AnimatedSplashOverlay } from "@/components/animated-icon";
 import AppTabs from "@/components/app-tabs";
-import { AuthProvider, getAccessToken } from "@/context/auth";
+import { AuthProvider, getAccessToken, useAuth } from "@/context/auth";
 import { ApolloClient, HttpLink, InMemoryCache } from "@apollo/client";
 import { ApolloProvider } from "@apollo/client/react";
 import { API_URL } from "@/utils/constants";
 import { SetContextLink } from "@apollo/client/link/context";
-import { platformApiLevel } from "expo-device";
+import { createAuthErrorLink } from "@/auth/auth-error-link";
+import { refreshSession } from "@/context/auth";
 
 const link = new HttpLink({
   uri: API_URL,
@@ -26,11 +27,22 @@ const authLink = new SetContextLink(({ headers }) => {
 });
 
 const client = new ApolloClient({
-  link: authLink.concat(link),
+  link: createAuthErrorLink(refreshSession).concat(authLink).concat(link),
   cache: new InMemoryCache(),
 });
 
 SplashScreen.preventAutoHideAsync();
+
+function AppContent() {
+  const { isLoading } = useAuth();
+
+  return (
+    <>
+      <AnimatedSplashOverlay isLoading={isLoading} />
+      <AppTabs />
+    </>
+  );
+}
 
 export default function TabLayout() {
   const colorScheme = useColorScheme();
@@ -40,8 +52,7 @@ export default function TabLayout() {
         <ThemeProvider
           value={colorScheme === "dark" ? DarkTheme : DefaultTheme}
         >
-          <AnimatedSplashOverlay />
-          <AppTabs />
+          <AppContent />
         </ThemeProvider>
       </AuthProvider>
     </ApolloProvider>

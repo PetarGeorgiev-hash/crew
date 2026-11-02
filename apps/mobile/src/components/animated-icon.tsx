@@ -1,16 +1,17 @@
 import { Image } from 'expo-image';
 import * as SplashScreen from 'expo-splash-screen';
 import { useState } from 'react';
-import { Dimensions, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Dimensions, StyleSheet, View } from 'react-native';
 import Animated, { Easing, Keyframe } from 'react-native-reanimated';
 import { scheduleOnRN } from 'react-native-worklets';
 
 const INITIAL_SCALE_FACTOR = Dimensions.get('screen').height / 90;
 const DURATION = 600;
 
-export function AnimatedSplashOverlay() {
-  const [animate, setAnimate] = useState(false);
+export function AnimatedSplashOverlay({ isLoading }: { isLoading: boolean }) {
+  const [hasLaidOut, setHasLaidOut] = useState(false);
   const [visible, setVisible] = useState(true);
+  const animate = hasLaidOut && !isLoading;
 
   if (!visible) return null;
 
@@ -33,7 +34,12 @@ export function AnimatedSplashOverlay() {
     },
   });
 
-  const image = <Image style={styles.image} source={require('@/assets/images/expo-logo.png')} />;
+  const content = (
+    <View style={styles.splashContent}>
+      <Image style={styles.image} source={require('@/assets/images/expo-logo.png')} />
+      {isLoading && <ActivityIndicator color="#ffffff" />}
+    </View>
+  );
 
   return animate ? (
     <Animated.View
@@ -44,17 +50,17 @@ export function AnimatedSplashOverlay() {
         }
       })}
       style={styles.splashOverlay}>
-      {image}
+      {content}
     </Animated.View>
   ) : (
     <View
       onLayout={() => {
         SplashScreen.hideAsync().finally(() => {
-          setAnimate(true);
+          setHasLaidOut(true);
         });
       }}
       style={styles.splashOverlay}>
-      {image}
+      {content}
     </View>
   );
 }
@@ -111,6 +117,10 @@ export function AnimatedIcon() {
 }
 
 const styles = StyleSheet.create({
+  splashContent: {
+    alignItems: 'center',
+    gap: 24,
+  },
   imageContainer: {
     justifyContent: 'center',
     alignItems: 'center',
