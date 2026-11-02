@@ -48,11 +48,13 @@ Do not commit `apps/api/.env` or use the development credentials in `docker-comp
    ```
 
    When using this Compose database, set the host-side `DATABASE_URL` in `apps/api/.env` to port `6432`.
+
 3. Apply the database migrations:
 
    ```sh
    pnpm db:migrate
    ```
+
 4. Start the API:
 
    ```sh
@@ -93,14 +95,6 @@ docker compose ps
 docker compose logs -f api
 ```
 
-Stop the services without deleting the database volume:
-
-```sh
-docker compose down
-```
-
-To also delete the local database data, explicitly remove the volume with `docker compose down -v`.
-
 ## Database changes
 
 After changing the API's Drizzle schema, generate a migration and apply it:
@@ -112,12 +106,13 @@ pnpm db:migrate
 
 ## Useful commands
 
-| Command | Description |
-| --- | --- |
-| `pnpm dev:api` | Start the API and Drizzle Studio through Turbo |
-| `pnpm --filter @crew/api dev` | Start only the API in watch mode |
-| `pnpm dev:mobile` | Start Expo |
-| `pnpm build` | Build workspace packages |
-| `pnpm db:generate` | Generate database migrations |
-| `pnpm db:migrate` | Apply database migrations |
-| `pnpm db:studio` | Start Drizzle Studio on port 3300 |
+| Command                       | Description                                    |
+| ----------------------------- | ---------------------------------------------- |
+| `pnpm dev`                    | Start the mobile, api and drizzle studio       |
+| `pnpm dev:api`                | Start the API and Drizzle Studio through Turbo |
+| `pnpm --filter @crew/api dev` | Start only the API in watch mode               |
+| `pnpm dev:mobile`             | Start Expo                                     |
+| `pnpm build`                  | Build workspace packages                       |
+| `pnpm db:generate`            | Generate database migrations                   |
+| `pnpm db:migrate`             | Apply database migrations                      |
+| `pnpm db:studio`              | Start Drizzle Studio on port 3300              |

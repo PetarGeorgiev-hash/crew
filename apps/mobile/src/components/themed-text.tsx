@@ -14,7 +14,10 @@ export function ThemedText({ style, type = 'default', themeColor, ...rest }: The
   return (
     <Text
       style={[
-        { color: theme[themeColor ?? 'text'] },
+        {
+          color: theme[themeColor ?? 'text'],
+          fontFamily: type === 'code' ? Fonts.mono : Fonts.sans,
+        },
         type === 'default' && styles.default,
         type === 'title' && styles.title,
         type === 'small' && styles.small,

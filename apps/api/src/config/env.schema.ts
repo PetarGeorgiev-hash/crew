@@ -7,6 +7,7 @@ export const envSchema = z
     NODE_ENV: z
       .enum(['development', 'test', 'production'])
       .default('development'),
+    WEB_APP_ORIGINS: z.string().optional(),
 
     //db
     DATABASE_URL: z.string(),
@@ -16,6 +17,7 @@ export const envSchema = z
     ACCESS_TOKEN_EXPIRES_IN: z.string(),
 
     GOOGLE_CLIENT_ID: z.string().optional(),
+    GOOGLE_CLIENT_IDS: z.string().optional(),
     GOOGLE_CLIENT_SECRET: z.string().optional(),
     GOOGLE_CALLBACK_URL: z.string().optional(),
 
@@ -33,6 +35,13 @@ export const envSchema = z
     message: 'RESEND_API_KEY is required when MAIL_DRIVER=resend',
     path: ['RESEND_API_KEY'],
   })
+  .refine(
+    (env) => env.NODE_ENV !== 'production' || !!env.WEB_APP_ORIGINS?.trim(),
+    {
+      message: 'WEB_APP_ORIGINS is required in production',
+      path: ['WEB_APP_ORIGINS'],
+    },
+  )
   .refine(
     (env) => !(env.NODE_ENV === 'production' && env.MAIL_DRIVER === 'console'),
     {

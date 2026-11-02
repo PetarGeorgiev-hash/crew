@@ -1,20 +1,28 @@
-import { BadRequestException, Logger } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  Logger,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { AuthService } from '../auth.service';
 
-describe('AuthService email verification', () => {
+describe('AuthService', () => {
   const users = {
     findById: vi.fn(),
     createWithPassword: vi.fn(),
     markVerifiedEmail: vi.fn(),
+    resolveGoogleIdentity: vi.fn(),
   };
   const mail = { sendVerification: vi.fn(), verify: vi.fn() };
   const jwt = { signAsync: vi.fn() };
   const refreshRepo = { create: vi.fn() };
-  const config = { getOrThrow: vi.fn() };
+  const config = { get: vi.fn(), getOrThrow: vi.fn() };
   let service: AuthService;
 
   beforeEach(() => {
     vi.resetAllMocks();
+    vi.unstubAllGlobals();
+    config.get.mockReturnValue('x');
     config.getOrThrow.mockImplementation((key: string) =>
       key === 'REFRESH_TOKEN_TTL_DAYS' ? '60' : 'x',
     );
@@ -89,5 +97,102 @@ describe('AuthService email verification', () => {
       // catch the mocked error from provider so the Termianl doesn't light up with red
       loggerError.mockRestore();
     }
+  });
+
+  it('verifies Google claims, resolves the identity, and issues Crew tokens', async () => {
+    const user = {
+      id: 'u1',
+      email: 'person@example.com',
+      userName: 'Person',
+      avatarUrl: 'https://example.com/avatar.png',
+      emailVerified: true,
+    };
+    users.resolveGoogleIdentity.mockResolvedValue(user);
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        new Response(
+          JSON.stringify({
+            aud: 'x',
+            iss: 'https://accounts.google.com',
+            exp: String(Math.floor(Date.now() / 1000) + 300),
+            sub: 'google-sub',
+            email: 'Person@Example.com',
+            email_verified: 'true',
+            name: 'Person',
+            picture: 'https://example.com/avatar.png',
+          }),
+          { status: 200 },
+        ),
+      ),
+    );
+
+    const result = await service.signInWithGoogle('google-id-token');
+
+    expect(users.resolveGoogleIdentity).toHaveBeenCalledWith({
+      email: 'person@example.com',
+      providerUserId: 'google-sub',
+      userName: 'Person',
+      avatarUrl: 'https://example.com/avatar.png',
+    });
+    expect(refreshRepo.create).toHaveBeenCalledWith(
+      expect.objectContaining({ userId: 'u1' }),
+    );
+    expect(result).toMatchObject({
+      user: { id: 'u1', email: 'person@example.com' },
+      accessToken: 'access',
+      refreshToken: expect.any(String),
+    });
+  });
+
+  it('rejects unverified Google email claims before resolving an account', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        new Response(
+          JSON.stringify({
+            aud: 'x',
+            iss: 'https://accounts.google.com',
+            exp: String(Math.floor(Date.now() / 1000) + 300),
+            sub: 'google-sub',
+            email: 'person@example.com',
+            email_verified: 'false',
+          }),
+          { status: 200 },
+        ),
+      ),
+    );
+
+    await expect(
+      service.signInWithGoogle('google-id-token'),
+    ).rejects.toBeInstanceOf(UnauthorizedException);
+    expect(users.resolveGoogleIdentity).not.toHaveBeenCalled();
+  });
+
+  it('propagates the existing-account linking conflict', async () => {
+    users.resolveGoogleIdentity.mockRejectedValue(
+      new ConflictException('Sign in to the existing account first'),
+    );
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        new Response(
+          JSON.stringify({
+            aud: 'x',
+            iss: 'https://accounts.google.com',
+            exp: String(Math.floor(Date.now() / 1000) + 300),
+            sub: 'google-sub',
+            email: 'person@example.com',
+            email_verified: 'true',
+          }),
+          { status: 200 },
+        ),
+      ),
+    );
+
+    await expect(
+      service.signInWithGoogle('google-id-token'),
+    ).rejects.toBeInstanceOf(ConflictException);
+    expect(refreshRepo.create).not.toHaveBeenCalled();
   });
 });
