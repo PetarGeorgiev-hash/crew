@@ -1,0 +1,92 @@
+fragment AuthUserFields on UserModel {
+  id
+  email
+  userName
+  avatarUrl
+  emailVerified
+}
+
+mutation Login($loginModel: LoginModel!) {
+  login(loginModel: $loginModel) {
+    user {
+      ...AuthUserFields
+    }
+    accessToken
+    refreshToken
+  }
+}
+
+mutation WebLogin($loginModel: LoginModel!) {
+  webLogin(loginModel: $loginModel) {
+    user {
+      ...AuthUserFields
+    }
+    accessToken
+  }
+}
+
+mutation Register($registerModel: RegisterModel!) {
+  register(registerModel: $registerModel) {
+    user {
+      ...AuthUserFields
+    }
+    accessToken
+    refreshToken
+  }
+}
+
+mutation Refresh($refreshTokenInput: RefreshTokenInput!) {
+  refresh(refreshTokenInput: $refreshTokenInput) {
+    user {
+      ...AuthUserFields
+    }
+    accessToken
+    refreshToken
+  }
+}
+
+mutation WebRefreshToken {
+  webRefresh {
+    user {
+      ...AuthUserFields
+    }
+    accessToken
+  }
+}
+
+query GetProfile {
+  getProfile {
+    ...AuthUserFields
+  }
+}
+
+mutation Logout {
+  logout {
+    success
+  }
+}
+
+mutation WebLogout {
+  webLogout {
+    success
+  }
+}
+
+mutation SignInWithGoogle($idToken: String!) {
+  signInWithGoogle(idToken: $idToken) {
+    user {
+      ...AuthUserFields
+    }
+    accessToken
+    refreshToken
+  }
+}
+
+mutation WebSignInWithGoogle($idToken: String!) {
+  webSignInWithGoogle(idToken: $idToken) {
+    user {
+      ...AuthUserFields
+    }
+    accessToken
+  }
+}

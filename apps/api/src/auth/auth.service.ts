@@ -18,6 +18,7 @@ import { AuthResult } from './models/auth-result.model';
 import { RefreshTokensRepository } from './auth.repository';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { MailService } from '../mail/mail.service';
+import { GoogleTokenInfo } from './types/google-token-info.type';
 
 @Injectable()
 export class AuthService {
@@ -34,8 +35,6 @@ export class AuthService {
     return email.trim().toLowerCase();
   }
 
-  // SHA-256 is fine here: the refresh token is 32 random bytes,
-  // so it can't be guessed. (argon2 is only for passwords.)
   private hashToken(token: string): string {
     return createHash('sha256').update(token).digest('hex');
   }
@@ -56,14 +55,6 @@ export class AuthService {
     });
   }
 
-  /**
-   * Creates a login session:
-   * 1. random refresh token (sent to the client)
-   * 2. its hash saved in refresh_tokens (never the token itself)
-   * 3. access token carrying the user id (sub) and session id (sid)
-   *
-   * familyId: omit for a new login, pass the existing one when refreshing.
-   */
   private async startSession(
     user: User,
     familyId: string = randomUUID(),
@@ -118,8 +109,6 @@ export class AuthService {
     const email = this.normalizeEmail(registerModel.email);
     const passwordHash = await argon2.hash(registerModel.password);
 
-    // No findByEmail pre-check: the unique index on email is the real
-    // guard, and checking first has a race. We catch its error instead.
     let user: User;
     try {
       user = await this.userService.createWithPassword({
@@ -191,12 +180,9 @@ export class AuthService {
   async refreshToken(refreshTokenInput: string): Promise<AuthResult> {
     const hash = this.hashToken(refreshTokenInput);
 
-    // Atomic: if two requests send the same token, only one gets a row.
     const claimed = await this.refreshTokensRepository.claim(hash);
 
     if (!claimed) {
-      // Failed. If the token was real and already used, it's a replay
-      // (possible theft): revoke that whole login.
       const existing = await this.refreshTokensRepository.findByHash(hash);
       if (existing?.usedAt && !existing.revokedAt) {
         await this.refreshTokensRepository.revokeFamily(existing.familyId);
@@ -209,7 +195,6 @@ export class AuthService {
       throw new UnauthorizedException('Invalid or expired refresh token');
     }
 
-    // Same familyId: same login, just a new token in the chain.
     const { accessToken, refreshToken } = await this.startSession(
       user,
       claimed.familyId,
@@ -218,7 +203,6 @@ export class AuthService {
     return this.toAuthResult(user, accessToken, refreshToken);
   }
 
-  // Logs out this device only (sid comes from the access token).
   async logout(sid: string): Promise<{ success: true }> {
     await this.refreshTokensRepository.revokeFamily(sid);
     return { success: true };
@@ -235,6 +219,68 @@ export class AuthService {
       throw new UnauthorizedException('User no longer exists');
     }
     return this.userService.toSafeUser(user);
+  }
+
+  private async verifyGoogleIdToken(
+    idToken: string,
+  ): Promise<GoogleTokenInfo & { sub: string; email: string }> {
+    const url = new URL('https://oauth2.googleapis.com/tokeninfo');
+    url.searchParams.set('id_token', idToken);
+
+    const response = await fetch(url, {
+      signal: AbortSignal.timeout(5_000),
+    });
+
+    if (!response.ok) {
+      throw new UnauthorizedException('Invalid Google ID token');
+    }
+
+    const claims = (await response.json()) as GoogleTokenInfo;
+    const expectedClientIds = [
+      this.configService.get<string>('GOOGLE_CLIENT_ID'),
+      this.configService.get<string>('GOOGLE_CLIENT_IOS_IDS'),
+    ]
+      .flatMap((value) => value?.split(',') ?? [])
+      .map((value) => value.trim())
+      .filter(Boolean);
+
+    if (expectedClientIds.length === 0) {
+      throw new Error('Configure GOOGLE_CLIENT_ID or GOOGLE_CLIENT_IDS');
+    }
+
+    if (
+      !expectedClientIds.includes(claims.aud ?? '') ||
+      !['https://accounts.google.com', 'accounts.google.com'].includes(
+        claims.iss ?? '',
+      ) ||
+      !claims.sub ||
+      !claims.email ||
+      ![true, 'true'].includes(claims.email_verified ?? false) ||
+      !claims.exp ||
+      Number(claims.exp) <= Math.floor(Date.now() / 1000)
+    ) {
+      throw new UnauthorizedException('Invalid Google ID token');
+    }
+
+    return { ...claims, sub: claims.sub, email: claims.email };
+  }
+
+  async signInWithGoogle(idToken: string): Promise<AuthResult> {
+    if (!idToken) {
+      throw new UnauthorizedException('Invalid Google ID token');
+    }
+    const claims = await this.verifyGoogleIdToken(idToken);
+    const email = this.normalizeEmail(claims.email);
+    const userName =
+      claims.name?.trim().slice(0, 255) || email.split('@')[0] || email;
+    const user = await this.userService.resolveGoogleIdentity({
+      email,
+      providerUserId: claims.sub,
+      userName,
+      avatarUrl: claims.picture,
+    });
+    const { accessToken, refreshToken } = await this.startSession(user);
+    return this.toAuthResult(user, accessToken, refreshToken);
   }
 
   @Cron(CronExpression.EVERY_DAY_AT_MIDNIGHT, {

@@ -2,7 +2,6 @@ FROM node:26-alpine AS base
 WORKDIR /app
 ENV PNPM_HOME="/pnpm"
 ENV PATH="$PNPM_HOME/bin:$PATH"
-ENV NODE_ENV=production
 RUN npm install -g pnpm@12.4.1
 
 FROM base AS prepare

@@ -27,6 +27,11 @@ type LogoutResponse {
   success: Boolean!
 }
 
+type WebAuthResult {
+  user: UserModel!
+  accessToken: String!
+}
+
 type Query {
   findOne(id: String!): UserModel!
   getProfile: UserModel!
@@ -34,11 +39,17 @@ type Query {
 
 type Mutation {
   login(loginModel: LoginModel!): AuthResult!
+  webLogin(loginModel: LoginModel!): WebAuthResult!
   register(registerModel: RegisterModel!): AuthResult!
+  webRegister(registerModel: RegisterModel!): WebAuthResult!
   refresh(refreshTokenInput: RefreshTokenInput!): AuthResult!
+  webRefresh: WebAuthResult!
   logout: LogoutResponse!
+  webLogout: LogoutResponse!
   verifyEmail(input: VerifyEmailInput!): Boolean!
   resendVerifyEmail: Boolean!
+  signInWithGoogle(idToken: String!): AuthResult!
+  webSignInWithGoogle(idToken: String!): WebAuthResult!
 }
 
 input LoginModel {
