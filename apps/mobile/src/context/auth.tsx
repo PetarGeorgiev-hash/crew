@@ -10,6 +10,10 @@ import {
   WebLogoutDocument,
   LoginDocument,
   WebLoginDocument,
+  RegisterDocument,
+  WebRegisterDocument,
+  VerifyEmailDocument,
+  ResendVerifyEmailDocument,
   RefreshDocument,
   WebRefreshTokenDocument,
 } from "@/gql/graphql";
@@ -21,6 +25,7 @@ import {
   REFRESH_TOKEN_KEY,
 } from "@/utils/constants";
 import { ApolloClient, HttpLink, InMemoryCache } from "@apollo/client";
+import { CombinedGraphQLErrors } from "@apollo/client/errors";
 import { useMutation } from "@apollo/client/react";
 import * as SecureStore from "expo-secure-store";
 import { Platform } from "react-native";
@@ -29,6 +34,15 @@ import { singleFlight } from "@/auth/single-flight";
 export type AuthUser = AuthUserFieldsFragment;
 
 WebBrowser.maybeCompleteAuthSession();
+
+function isUnauthenticatedError(error: unknown): boolean {
+  return (
+    CombinedGraphQLErrors.is(error) &&
+    error.errors.some(
+      ({ extensions }) => extensions?.code === "UNAUTHENTICATED",
+    )
+  );
+}
 
 const refreshClient = new ApolloClient({
   link: new HttpLink({
@@ -43,10 +57,17 @@ const performRefreshSession = async (): Promise<{
   user: AuthUser;
 } | null> => {
   if (Platform.OS === "web") {
-    const { data } = await refreshClient.mutate({
-      mutation: WebRefreshTokenDocument,
-      fetchPolicy: "no-cache",
-    });
+    let data;
+    try {
+      ({ data } = await refreshClient.mutate({
+        mutation: WebRefreshTokenDocument,
+        fetchPolicy: "no-cache",
+      }));
+    } catch (cause) {
+      if (isUnauthenticatedError(cause)) return null;
+      throw cause;
+    }
+
     const result = data?.webRefresh;
     if (!result) throw new Error("Refresh returned no authentication data");
 
@@ -60,11 +81,22 @@ const performRefreshSession = async (): Promise<{
   const refreshToken = await getRefreshToken();
   if (!refreshToken) return null;
 
-  const { data } = await refreshClient.mutate({
-    mutation: RefreshDocument,
-    variables: { refreshTokenInput: { refreshToken } },
-    fetchPolicy: "no-cache",
-  });
+  let data;
+  try {
+    ({ data } = await refreshClient.mutate({
+      mutation: RefreshDocument,
+      variables: { refreshTokenInput: { refreshToken } },
+      fetchPolicy: "no-cache",
+    }));
+  } catch (cause) {
+    if (isUnauthenticatedError(cause)) {
+      await SecureStore.deleteItemAsync(REFRESH_TOKEN_KEY);
+      setAccessToken(null);
+      return null;
+    }
+    throw cause;
+  }
+
   const result = data?.refresh;
   if (!result) throw new Error("Refresh returned no authentication data");
 
@@ -87,6 +119,12 @@ const AuthContext = React.createContext({
   user: null as AuthUser | null,
   clearTokens: () => {},
   signIn: (authMethod: AuthMethod, email?: string, password?: string) => {},
+  register: async (_username: string, _email: string, _password: string) =>
+    false,
+  registrationUser: null as AuthUser | null,
+  deferVerification: () => {},
+  verifyEmail: async (_code: string) => false,
+  resendVerifyEmail: async () => false,
   signOut: () => {},
   isLoading: false,
   error: null as Error | null,
@@ -95,6 +133,8 @@ const AuthContext = React.createContext({
 
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [user, setUser] = React.useState<AuthUser | null>(null);
+  const [registrationUser, setRegistrationUser] =
+    React.useState<AuthUser | null>(null);
   const [isLoading, setIsLoading] = React.useState(true);
   const [error, setError] = React.useState<Error | null>(null);
   const restoreSessionRef = React.useRef<Promise<AuthUser | null> | null>(null);
@@ -113,6 +153,14 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [webLoginMutation] = useMutation(WebLoginDocument, {
     context: { skipAuthRefresh: true },
   });
+  const [registerMutation] = useMutation(RegisterDocument, {
+    context: { skipAuthRefresh: true },
+  });
+  const [webRegisterMutation] = useMutation(WebRegisterDocument, {
+    context: { skipAuthRefresh: true },
+  });
+  const [verifyEmailMutation] = useMutation(VerifyEmailDocument);
+  const [resendVerifyEmailMutation] = useMutation(ResendVerifyEmailDocument);
 
   //google
   const [signInWithGoogle] = useMutation(SignInWithGoogleDocument, {
@@ -169,6 +217,104 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       case AuthMethod.google:
         googleSignIn();
         break;
+    }
+  };
+
+  const register = async (
+    username: string,
+    email: string,
+    password: string,
+  ): Promise<boolean> => {
+    setError(null);
+    setIsLoading(true);
+
+    try {
+      if (isWeb) {
+        const { data } = await webRegisterMutation({
+          variables: {
+            registerModel: { username, email, password },
+          },
+        });
+        const result = data?.webRegister;
+        if (!result) {
+          throw new Error("Registration returned no authentication data");
+        }
+
+        setAccessToken(result.accessToken);
+        setRegistrationUser(
+          getFragmentData(AuthUserFieldsFragmentDoc, result.user),
+        );
+      } else {
+        const { data } = await registerMutation({
+          variables: {
+            registerModel: { username, email, password },
+          },
+        });
+        const result = data?.register;
+        if (!result) {
+          throw new Error("Registration returned no authentication data");
+        }
+
+        await setRefreshToken(result.refreshToken);
+        setAccessToken(result.accessToken);
+        setRegistrationUser(
+          getFragmentData(AuthUserFieldsFragmentDoc, result.user),
+        );
+      }
+
+      return true;
+    } catch (cause) {
+      setError(cause instanceof Error ? cause : new Error(String(cause)));
+      return false;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const deferVerification = () => {
+    if (registrationUser) setUser(registrationUser);
+    setRegistrationUser(null);
+  };
+
+  const verifyEmail = async (code: string): Promise<boolean> => {
+    setError(null);
+    setIsLoading(true);
+    try {
+      const { data } = await verifyEmailMutation({
+        variables: { input: { code } },
+      });
+      if (data?.verifyEmail !== true) {
+        throw new Error("The server did not confirm email verification");
+      }
+      if (registrationUser) {
+        setUser({ ...registrationUser, emailVerified: true });
+        setRegistrationUser(null);
+      } else if (user) {
+        setUser({ ...user, emailVerified: true });
+      }
+      return true;
+    } catch (cause) {
+      setError(cause instanceof Error ? cause : new Error(String(cause)));
+      return false;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const resendVerifyEmail = async (): Promise<boolean> => {
+    setError(null);
+    setIsLoading(true);
+    try {
+      const { data } = await resendVerifyEmailMutation();
+      if (data?.resendVerifyEmail !== true) {
+        throw new Error("The server did not confirm the verification email");
+      }
+      return true;
+    } catch (cause) {
+      setError(cause instanceof Error ? cause : new Error(String(cause)));
+      return false;
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -288,8 +434,13 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     <AuthContext.Provider
       value={{
         user,
+        registrationUser,
         clearTokens,
         signIn,
+        register,
+        deferVerification,
+        verifyEmail,
+        resendVerifyEmail,
         signOut,
         isLoading,
         error,

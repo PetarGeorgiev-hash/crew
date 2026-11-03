@@ -1,72 +1,36 @@
 import { useAuth } from "@/context/auth";
-import { View, StyleSheet, Button } from "react-native";
-import { ThemedText } from "../../themed-text";
-import { ThemedView } from "../../themed-view";
+import { Pressable, StyleSheet } from "react-native";
+import { useTheme } from "@/hooks/use-theme";
+import { ThemedText } from "@/components/themed-text";
 
 export default function LogoutBtn() {
   const { signOut, isLoading } = useAuth();
+  const theme = useTheme();
 
   return (
-    <ThemedView style={styles.container}>
-      <View style={styles.card}>
-        <View style={styles.contentContainer}>
-          <View style={styles.titleContainer}>
-            <ThemedText type="subtitle" style={styles.title}>
-              Welcome to Your App
-            </ThemedText>
-            <ThemedText style={styles.description}>
-              Experience seamless authentication{"\n"}
-              powered by Expo.{"\n"}
-            </ThemedText>
-          </View>
-
-          <View style={styles.buttonContainer}>
-            <Button title="Sign Out" onPress={signOut} disabled={isLoading} />
-          </View>
-        </View>
-      </View>
-    </ThemedView>
+    <Pressable
+      accessibilityRole="button"
+      disabled={isLoading}
+      onPress={() => void signOut()}
+      style={({ pressed }) => [
+        styles.button,
+        { backgroundColor: theme.backgroundSelected },
+        (pressed || isLoading) && styles.buttonPressed,
+      ]}
+    >
+      <ThemedText>{isLoading ? "Signing out..." : "Sign out"}</ThemedText>
+    </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    justifyContent: "center",
+  button: {
     alignItems: "center",
-    padding: 16,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 10,
   },
-  titleContainer: {
-    alignItems: "center",
-    gap: 12,
-  },
-  card: {
-    width: "100%",
-    maxWidth: 360,
-    alignItems: "center",
-  },
-  logo: {
-    width: 100,
-    height: 100,
-    resizeMode: "contain",
-    marginBottom: 32,
-  },
-  contentContainer: {
-    width: "100%",
-    gap: 32,
-  },
-  title: {
-    textAlign: "center",
-    fontSize: 30,
-  },
-  buttonContainer: {
-    width: "100%",
-    gap: 12,
-  },
-  description: {
-    textAlign: "center",
-    fontSize: 16,
-    color: "#666",
-    lineHeight: 24,
+  buttonPressed: {
+    opacity: 0.6,
   },
 });

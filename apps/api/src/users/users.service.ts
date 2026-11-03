@@ -2,7 +2,7 @@ import { ConflictException, Inject, Injectable } from '@nestjs/common';
 import { DATABASE_CONNECTION } from '../db/db-connection';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { SafeUser, User, users } from './schema/user.schema';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, sql } from 'drizzle-orm';
 import { CreateUserModel } from './models/createUser-input.model';
 import { identities } from '../auth/schema/identities.schema';
 
@@ -26,6 +26,15 @@ export class UsersService {
       .select()
       .from(users)
       .where(eq(users.email, email))
+      .limit(1);
+    return user;
+  }
+
+  async findByUserName(userName: string): Promise<User | undefined> {
+    const [user] = await this.db
+      .select()
+      .from(users)
+      .where(sql`lower(${users.userName}) = ${userName.toLowerCase()}`)
       .limit(1);
     return user;
   }

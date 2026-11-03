@@ -35,6 +35,23 @@ mutation Register($registerModel: RegisterModel!) {
   }
 }
 
+mutation WebRegister($registerModel: RegisterModel!) {
+  webRegister(registerModel: $registerModel) {
+    user {
+      ...AuthUserFields
+    }
+    accessToken
+  }
+}
+
+mutation VerifyEmail($input: VerifyEmailInput!) {
+  verifyEmail(input: $input)
+}
+
+mutation ResendVerifyEmail {
+  resendVerifyEmail
+}
+
 mutation Refresh($refreshTokenInput: RefreshTokenInput!) {
   refresh(refreshTokenInput: $refreshTokenInput) {
     user {
