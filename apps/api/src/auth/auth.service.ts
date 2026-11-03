@@ -108,17 +108,24 @@ export class AuthService {
   async register(registerModel: RegisterModel): Promise<AuthResult> {
     const email = this.normalizeEmail(registerModel.email);
     const passwordHash = await argon2.hash(registerModel.password);
+    const userName = registerModel.username.trim().toLowerCase();
 
     let user: User;
     try {
       user = await this.userService.createWithPassword({
-        userName: registerModel.name,
+        userName,
         email,
         passwordHash,
       });
     } catch (e) {
       if (this.isUniqueViolation(e)) {
-        throw new ConflictException('User with this email already exists');
+        if (await this.userService.findByEmail(email)) {
+          throw new ConflictException('User with this email already exists');
+        }
+        if (await this.userService.findByUserName(userName)) {
+          throw new ConflictException('This username is already taken');
+        }
+        throw e;
       }
       throw e;
     }
@@ -265,20 +272,47 @@ export class AuthService {
     return { ...claims, sub: claims.sub, email: claims.email };
   }
 
+  private googleUserName(
+    email: string,
+    providerUserId: string,
+    attempt: number,
+  ): string {
+    const emailPrefix = email.split('@')[0] ?? 'user';
+    const base = emailPrefix
+      .toLowerCase()
+      .replace(/[^a-z0-9_]+/g, '_')
+      .replace(/^_+|_+$/g, '')
+      .slice(0, 17);
+    const suffix = createHash('sha256')
+      .update(`${providerUserId}:${attempt}`)
+      .digest('hex')
+      .slice(0, 12);
+
+    return `${base || 'user'}_${suffix}`;
+  }
+
   async signInWithGoogle(idToken: string): Promise<AuthResult> {
     if (!idToken) {
       throw new UnauthorizedException('Invalid Google ID token');
     }
     const claims = await this.verifyGoogleIdToken(idToken);
     const email = this.normalizeEmail(claims.email);
-    const userName =
-      claims.name?.trim().slice(0, 255) || email.split('@')[0] || email;
-    const user = await this.userService.resolveGoogleIdentity({
-      email,
-      providerUserId: claims.sub,
-      userName,
-      avatarUrl: claims.picture,
-    });
+    let user: User | undefined;
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      try {
+        user = await this.userService.resolveGoogleIdentity({
+          email,
+          providerUserId: claims.sub,
+          userName: this.googleUserName(email, claims.sub, attempt),
+          avatarUrl: claims.picture,
+        });
+        break;
+      } catch (error) {
+        if (!this.isUniqueViolation(error) || attempt === 2) throw error;
+      }
+    }
+
+    if (!user) throw new Error('Google account could not be resolved');
     const { accessToken, refreshToken } = await this.startSession(user);
     return this.toAuthResult(user, accessToken, refreshToken);
   }

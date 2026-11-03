@@ -9,6 +9,8 @@ import { AuthService } from '../auth.service';
 describe('AuthService', () => {
   const users = {
     findById: vi.fn(),
+    findByEmail: vi.fn(),
+    findByUserName: vi.fn(),
     createWithPassword: vi.fn(),
     markVerifiedEmail: vi.fn(),
     resolveGoogleIdentity: vi.fn(),
@@ -86,17 +88,40 @@ describe('AuthService', () => {
 
     try {
       const result = await service.register({
-        name: 'A',
+        username: 'A_User',
         email: 'A@b.com',
         password: 'password123',
       });
 
       expect(result.accessToken).toBe('access');
+      expect(users.createWithPassword).toHaveBeenCalledWith(
+        expect.objectContaining({ userName: 'a_user', email: 'a@b.com' }),
+      );
       expect(mail.sendVerification).toHaveBeenCalledWith('u1', 'a@b.com');
     } finally {
       // catch the mocked error from provider so the Termianl doesn't light up with red
       loggerError.mockRestore();
     }
+  });
+
+  it('rejects a username that is already taken, ignoring case', async () => {
+    users.createWithPassword.mockRejectedValue({
+      code: '23505',
+      constraint: 'users_user_name_lower_unique',
+    });
+    users.findByEmail.mockResolvedValue(undefined);
+    users.findByUserName.mockResolvedValue({ id: 'existing-user' });
+
+    await expect(
+      service.register({
+        username: 'CrewUser',
+        email: 'new@example.com',
+        password: 'password123',
+      }),
+    ).rejects.toMatchObject({
+      message: 'This username is already taken',
+    });
+    expect(users.findByUserName).toHaveBeenCalledWith('crewuser');
   });
 
   it('verifies Google claims, resolves the identity, and issues Crew tokens', async () => {
@@ -119,7 +144,6 @@ describe('AuthService', () => {
             sub: 'google-sub',
             email: 'Person@Example.com',
             email_verified: 'true',
-            name: 'Person',
             picture: 'https://example.com/avatar.png',
           }),
           { status: 200 },
@@ -132,7 +156,7 @@ describe('AuthService', () => {
     expect(users.resolveGoogleIdentity).toHaveBeenCalledWith({
       email: 'person@example.com',
       providerUserId: 'google-sub',
-      userName: 'Person',
+      userName: expect.stringMatching(/^person_[a-f0-9]{12}$/),
       avatarUrl: 'https://example.com/avatar.png',
     });
     expect(refreshRepo.create).toHaveBeenCalledWith(

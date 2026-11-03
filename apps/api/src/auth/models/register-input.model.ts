@@ -2,6 +2,7 @@ import { Field, InputType } from '@nestjs/graphql';
 import {
   IsEmail,
   IsNotEmpty,
+  Matches,
   IsString,
   MaxLength,
   MinLength,
@@ -11,7 +12,10 @@ import {
 export class RegisterModel {
   @Field()
   @IsString()
-  name: string;
+  @IsNotEmpty()
+  @MaxLength(30)
+  @Matches(/^[a-zA-Z0-9_]{3,30}$/)
+  username: string;
 
   @Field()
   @IsEmail()

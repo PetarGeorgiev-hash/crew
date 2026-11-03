@@ -1,5 +1,4 @@
-import { useAuth } from "@/context/auth";
-import { useTheme } from "@/hooks/use-theme";
+import { useState } from "react";
 import {
   Keyboard,
   Pressable,
@@ -10,16 +9,45 @@ import {
   TouchableWithoutFeedback,
   View,
 } from "react-native";
+import { useAuth } from "@/context/auth";
+import { useTheme } from "@/hooks/use-theme";
 import { ThemedText } from "../../themed-text";
 import { ThemedView } from "../../themed-view";
-import { useState } from "react";
+
+type AuthScreen = "login" | "register" | "choice" | "verify";
 
 export default function LoginForm() {
-  const { signIn, isLoading, AuthMethod } = useAuth();
+  const {
+    signIn,
+    register,
+    registrationUser,
+    deferVerification,
+    verifyEmail,
+    resendVerifyEmail,
+    isLoading,
+    error,
+    AuthMethod,
+  } = useAuth();
   const theme = useTheme();
 
+  const [screen, setScreen] = useState<AuthScreen>("login");
+  const activeScreen: AuthScreen = registrationUser
+    ? screen === "verify"
+      ? "verify"
+      : "choice"
+    : screen;
+  const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [verificationCode, setVerificationCode] = useState("");
+
+  const submitRegistration = async () => {
+    if (await register(username, email, password)) setScreen("choice");
+  };
+
+  const submitVerification = async () => {
+    await verifyEmail(verificationCode);
+  };
 
   const formContent = (
     <View style={styles.dismissArea}>
@@ -30,80 +58,203 @@ export default function LoginForm() {
       >
         <View style={styles.card}>
           <View style={styles.contentContainer}>
-            <View style={styles.titleContainer}>
-              <ThemedText type="subtitle" style={styles.title}>
-                Welcome to Your App
-              </ThemedText>
-              <ThemedText style={styles.description}>
-                Experience seamless authentication{"\n"}
-                powered by Expo.{"\n"}
-              </ThemedText>
-            </View>
-            <View style={styles.form}>
-              <ThemedText style={styles.label}>Email</ThemedText>
-              <TextInput
-                onChangeText={(text) => setEmail(text)}
-                value={email}
-                autoCapitalize="none"
-                autoComplete="email"
-                keyboardType="email-address"
-                style={[
-                  styles.input,
-                  {
-                    color: theme.text,
-                    backgroundColor: theme.background,
-                    borderColor: theme.backgroundSelected,
-                  },
-                ]}
-              />
-              <ThemedText style={styles.label}>Password</ThemedText>
-              <TextInput
-                onChangeText={(text) => setPassword(text)}
-                value={password}
-                autoComplete="current-password"
-                secureTextEntry
-                style={[
-                  styles.input,
-                  {
-                    color: theme.text,
-                    backgroundColor: theme.background,
-                    borderColor: theme.backgroundSelected,
-                  },
-                ]}
-              />
-              <View style={styles.buttonContainer}>
+            {registrationUser && activeScreen === "choice" ? (
+              <>
+                <View style={styles.titleContainer}>
+                  <ThemedText type="subtitle" style={styles.title}>
+                    Verify your email?
+                  </ThemedText>
+                  <ThemedText style={styles.description}>
+                    Email verification is optional. If you have the code for{" "}
+                    {registrationUser.email}, verify now or do it later.
+                  </ThemedText>
+                </View>
+                <View style={styles.buttonContainer}>
+                  <AuthButton
+                    title="Verify now"
+                    disabled={isLoading}
+                    onPress={() => setScreen("verify")}
+                    theme={theme}
+                  />
+                  <AuthButton
+                    title="Do this later"
+                    disabled={isLoading}
+                    onPress={deferVerification}
+                    theme={theme}
+                  />
+                </View>
+              </>
+            ) : activeScreen === "verify" && registrationUser ? (
+              <>
+                <View style={styles.titleContainer}>
+                  <ThemedText type="subtitle" style={styles.title}>
+                    Check your email
+                  </ThemedText>
+                  <ThemedText style={styles.description}>
+                    Enter the verification code sent to {registrationUser.email}
+                    .
+                  </ThemedText>
+                </View>
+                <View style={styles.form}>
+                  <ThemedText style={styles.label}>
+                    Verification code
+                  </ThemedText>
+                  <TextInput
+                    onChangeText={setVerificationCode}
+                    value={verificationCode}
+                    autoComplete="one-time-code"
+                    keyboardType="number-pad"
+                    style={[
+                      styles.input,
+                      {
+                        color: theme.text,
+                        backgroundColor: theme.background,
+                        borderColor: theme.backgroundSelected,
+                      },
+                    ]}
+                  />
+                  <AuthButton
+                    title={isLoading ? "Verifying..." : "Verify email"}
+                    disabled={isLoading || !verificationCode.trim()}
+                    onPress={submitVerification}
+                    theme={theme}
+                  />
+                  <AuthButton
+                    title={isLoading ? "Sending..." : "Resend code"}
+                    disabled={isLoading}
+                    onPress={() => void resendVerifyEmail()}
+                    theme={theme}
+                  />
+                  <Pressable
+                    accessibilityRole="button"
+                    disabled={isLoading}
+                    onPress={() => setScreen("choice")}
+                  >
+                    <ThemedText style={styles.link}>Do this later</ThemedText>
+                  </Pressable>
+                </View>
+              </>
+            ) : (
+              <>
+                <View style={styles.titleContainer}>
+                  <ThemedText type="subtitle" style={styles.title}>
+                    {activeScreen === "register"
+                      ? "Create your account"
+                      : "Welcome to Crew"}
+                  </ThemedText>
+                  <ThemedText style={styles.description}>
+                    {activeScreen === "register"
+                      ? "Choose a unique username, then sign up with your email and password."
+                      : "Sign in or create an account to continue."}
+                  </ThemedText>
+                </View>
+                <View style={styles.form}>
+                  {activeScreen === "register" && (
+                    <>
+                      <ThemedText style={styles.label}>Username</ThemedText>
+                      <TextInput
+                        onChangeText={setUsername}
+                        value={username}
+                        autoComplete="username"
+                        autoCapitalize="none"
+                        autoCorrect={false}
+                        maxLength={30}
+                        placeholder="3–30 letters, numbers, or underscores"
+                        style={[
+                          styles.input,
+                          {
+                            color: theme.text,
+                            backgroundColor: theme.background,
+                            borderColor: theme.backgroundSelected,
+                          },
+                        ]}
+                      />
+                    </>
+                  )}
+                  <ThemedText style={styles.label}>Email</ThemedText>
+                  <TextInput
+                    onChangeText={setEmail}
+                    value={email}
+                    autoCapitalize="none"
+                    autoComplete="email"
+                    keyboardType="email-address"
+                    style={[
+                      styles.input,
+                      {
+                        color: theme.text,
+                        backgroundColor: theme.background,
+                        borderColor: theme.backgroundSelected,
+                      },
+                    ]}
+                  />
+                  <ThemedText style={styles.label}>Password</ThemedText>
+                  <TextInput
+                    onChangeText={setPassword}
+                    value={password}
+                    autoComplete={
+                      activeScreen === "register"
+                        ? "new-password"
+                        : "current-password"
+                    }
+                    secureTextEntry
+                    style={[
+                      styles.input,
+                      {
+                        color: theme.text,
+                        backgroundColor: theme.background,
+                        borderColor: theme.backgroundSelected,
+                      },
+                    ]}
+                  />
+                  <AuthButton
+                    title={
+                      isLoading
+                        ? activeScreen === "register"
+                          ? "Creating account..."
+                          : "Signing in..."
+                        : activeScreen === "register"
+                          ? "Create account"
+                          : "Login"
+                    }
+                    disabled={isLoading}
+                    onPress={
+                      activeScreen === "register"
+                        ? submitRegistration
+                        : () => signIn(AuthMethod.local, email, password)
+                    }
+                    theme={theme}
+                  />
+                </View>
+                {activeScreen === "login" && (
+                  <AuthButton
+                    title={isLoading ? "Signing in..." : "Sign in with Google"}
+                    disabled={isLoading}
+                    onPress={() => signIn(AuthMethod.google)}
+                    theme={theme}
+                  />
+                )}
                 <Pressable
                   accessibilityRole="button"
                   disabled={isLoading}
-                  onPress={() => signIn(AuthMethod.local, email, password)}
-                  style={({ pressed }) => [
-                    styles.loginButton,
-                    { backgroundColor: theme.backgroundSelected },
-                    (pressed || isLoading) && styles.buttonPressed,
-                  ]}
+                  onPress={() =>
+                    setScreen(
+                      activeScreen === "register" ? "login" : "register",
+                    )
+                  }
                 >
-                  <ThemedText>
-                    {isLoading ? "Signing in..." : "Login"}
+                  <ThemedText style={styles.link}>
+                    {activeScreen === "register"
+                      ? "Already have an account? Sign in"
+                      : "Create an account"}
                   </ThemedText>
                 </Pressable>
-              </View>
-            </View>
-            <View style={styles.buttonContainer}>
-              <Pressable
-                accessibilityRole="button"
-                disabled={isLoading}
-                onPress={() => signIn(AuthMethod.google)}
-                style={({ pressed }) => [
-                  styles.googleButton,
-                  { backgroundColor: theme.backgroundSelected },
-                  (pressed || isLoading) && styles.buttonPressed,
-                ]}
-              >
-                <ThemedText>
-                  {isLoading ? "Signing in..." : "Sign in with Google"}
-                </ThemedText>
-              </Pressable>
-            </View>
+              </>
+            )}
+            {error && (
+              <ThemedText accessibilityRole="alert" style={styles.error}>
+                {error.message}
+              </ThemedText>
+            )}
           </View>
         </View>
       </ScrollView>
@@ -115,14 +266,38 @@ export default function LoginForm() {
       {Platform.OS === "web" ? (
         formContent
       ) : (
-        <TouchableWithoutFeedback
-          onPress={Keyboard.dismiss}
-          accessible={false}
-        >
+        <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
           {formContent}
         </TouchableWithoutFeedback>
       )}
     </ThemedView>
+  );
+}
+
+function AuthButton({
+  title,
+  disabled,
+  onPress,
+  theme,
+}: {
+  title: string;
+  disabled: boolean;
+  onPress: () => void;
+  theme: ReturnType<typeof useTheme>;
+}) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      disabled={disabled}
+      onPress={onPress}
+      style={({ pressed }) => [
+        styles.button,
+        { backgroundColor: theme.backgroundSelected },
+        (pressed || disabled) && styles.buttonPressed,
+      ]}
+    >
+      <ThemedText>{title}</ThemedText>
+    </Pressable>
   );
 }
 
@@ -181,14 +356,7 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     fontSize: 16,
   },
-  loginButton: {
-    alignItems: "center",
-    marginTop: 8,
-    paddingVertical: 12,
-    paddingHorizontal: 14,
-    borderRadius: 10,
-  },
-  googleButton: {
+  button: {
     alignItems: "center",
     justifyContent: "center",
     paddingVertical: 12,
@@ -197,5 +365,13 @@ const styles = StyleSheet.create({
   },
   buttonPressed: {
     opacity: 0.6,
+  },
+  link: {
+    textAlign: "center",
+    textDecorationLine: "underline",
+  },
+  error: {
+    color: "#d32f2f",
+    textAlign: "center",
   },
 });
