@@ -1,0 +1,83 @@
+name: Test CI
+
+on:
+  push:
+    branches: [main, stage, prod]
+  pull_request:
+    branches: [main, stage, prod]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Lint, test, and build
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:18-alpine
+        env:
+          POSTGRES_USER: root
+          POSTGRES_PASSWORD: ci-password
+          POSTGRES_DB: crewdb
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U root -d crewdb"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      NODE_ENV: test
+      DATABASE_URL: postgres://root:ci-password@localhost:5432/crewdb
+      ACCESS_TOKEN_SECRET: ci-access-token-secret
+      ACCESS_TOKEN_EXPIRES_IN: 15m
+      REFRESH_TOKEN_SECRET: ci-refresh-token-secret
+      REFRESH_TOKEN_TTL_DAYS: 7
+      MAIL_DRIVER: console
+      EMAIL_CODE_SECRET: ci-email-code-secret-for-tests-123456
+      MAX_ATTEMPTS: 5
+      CODE_TTL_MS: 600000
+      RESEND_COOLDOWN_MS: 60000
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 12.16.1
+          run_install: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint API source
+        run: pnpm --filter @crew/api exec eslint 'src/**/*.ts' 'test/**/*.ts'
+
+      - name: Check types
+        run: pnpm check-types
+        
+      - name: Build
+        run: pnpm build
+
+      - name: Apply migrations to CI database
+        run: pnpm --filter @crew/api db:migrate
+
+      - name: Run API tests
+        run: pnpm --filter @crew/api test
+
+      - name: Run API end-to-end tests
+        run: pnpm --filter @crew/api test:e2e
+
+      - name: Run mobile tests
+        run: pnpm --filter @crew/mobile test
