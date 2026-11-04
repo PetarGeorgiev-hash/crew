@@ -5,7 +5,7 @@ export default defineConfig({
   test: {
     globals: true,
     root: './',
-    include: ['test/**/*.e2e-spec.ts'],
+    include: ['test/**/*.e2e-test.ts'],
     fileParallelism: false,
     setupFiles: ['dotenv/config'],
     testTimeout: 15000,

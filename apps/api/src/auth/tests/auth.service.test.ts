@@ -153,20 +153,30 @@ describe('AuthService', () => {
 
     const result = await service.signInWithGoogle('google-id-token');
 
-    expect(users.resolveGoogleIdentity).toHaveBeenCalledWith({
+    expect(users.resolveGoogleIdentity).toHaveBeenCalledOnce();
+    const resolvedIdentity: unknown =
+      users.resolveGoogleIdentity.mock.calls[0]?.[0];
+    if (
+      typeof resolvedIdentity !== 'object' ||
+      resolvedIdentity === null ||
+      !('userName' in resolvedIdentity)
+    ) {
+      throw new Error('Google identity was not resolved');
+    }
+    expect(resolvedIdentity).toMatchObject({
       email: 'person@example.com',
       providerUserId: 'google-sub',
-      userName: expect.stringMatching(/^person_[a-f0-9]{12}$/),
       avatarUrl: 'https://example.com/avatar.png',
     });
+    expect(resolvedIdentity.userName).toMatch(/^person_[a-f0-9]{12}$/);
     expect(refreshRepo.create).toHaveBeenCalledWith(
       expect.objectContaining({ userId: 'u1' }),
     );
     expect(result).toMatchObject({
       user: { id: 'u1', email: 'person@example.com' },
       accessToken: 'access',
-      refreshToken: expect.any(String),
     });
+    expect(result.refreshToken).toEqual(expect.any(String));
   });
 
   it('rejects unverified Google email claims before resolving an account', async () => {

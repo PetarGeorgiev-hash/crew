@@ -18,9 +18,10 @@ export function setupDb() {
 }
 
 export async function createTestUser(db: ReturnType<typeof setupDb>['db']) {
+  const userName = `test_${randomUUID().replace(/-/g, '')}`;
   const [u] = await db
     .insert(users)
-    .values({ email: `test-${randomUUID()}@test.com`, userName: 'test' })
+    .values({ email: `test-${randomUUID()}@test.com`, userName })
     .returning();
   return u.id;
 }

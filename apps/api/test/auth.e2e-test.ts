@@ -64,7 +64,7 @@ describe('Auth flow (e2e)', () => {
 
     // 1. register
     const reg = await gql<{ register: Tokens }>(REGISTER, {
-      input: { name: 'E2E', email, password: 'password123' },
+      input: { username: 'e2e_user', email, password: 'password123' },
     });
     expect(reg.errors).toBeUndefined();
     const first = reg.data!.register;
